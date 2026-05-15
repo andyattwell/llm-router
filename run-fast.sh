@@ -2,10 +2,10 @@
 
 SCRIPT_DIR=$(dirname "$0")
 LLAMA=$(realpath $SCRIPT_DIR/../llama.cpp/build-cuda/bin/)
-MODELS_DIR=$(realpath $SCRIPT_DIR/../llama-models)
+MODEL=$(realpath $SCRIPT_DIR/models/gemma-2-2b-it-Q6_K_L.gguf)
 
 cd "$LLAMA" && exec llama-server \
-  -m ${MODELS_DIR}/gemma-2-2b-it-Q6_K_L.gguf \
+  -m ${MODEL} \
   --host 0.0.0.0 \
   --port 8081 \
   -ngl 999 \

@@ -3,11 +3,12 @@
 
 SCRIPT_DIR=$(dirname "$0")
 LLAMA=$(realpath $SCRIPT_DIR/../llama.cpp/build-cuda/bin/)
-MODELS_DIR=$(realpath $SCRIPT_DIR/../llama-models)
+MODEL=$(realpath $SCRIPT_DIR/models/gemma-4-E4B-it-Q5_K_M.gguf)
+MMPROJ=$(realpath $SCRIPT_DIR/models/gemma-4-E4B-it-Q5_K_M-mmproj-F16.gguf)
 
 cd "$LLAMA" && exec llama-server \
-  -m ${MODELS_DIR}/gemma-4-E4B-it-Q5_K_Mgguf \
-  --mmproj ${MODELS_DIR}/gemma-4-E4B-it-Q5_K_M-mmproj-F16.gguf \
+  -m ${MODEL} \
+  --mmproj ${MMPROJ} \
   --port 8082 \
   -ngl 999 \
   -c 4096 \
