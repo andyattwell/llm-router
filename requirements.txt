@@ -1,3 +1,6 @@
 fastapi
 uvicorn
 requests
+python-multipart
+openai-whisper
+pyttsx3

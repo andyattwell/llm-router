@@ -1,12 +1,18 @@
 #!/bin/bash
 
-./build/bin/llama-server \
-  -m ~/models/qwen2-vl-7b-instruct.Q4_K_M.gguf \
-  --mmproj ~/models/mmproj-qwen2-vl-7b-instruct-f16.gguf \
+
+SCRIPT_DIR=$(dirname "$0")
+LLAMA=$(realpath $SCRIPT_DIR/../llama.cpp/build-cuda/bin/)
+MODELS_DIR=$(realpath $SCRIPT_DIR/../llama-models)
+
+cd "$LLAMA" && exec llama-server \
+  -m ${MODELS_DIR}/Qwen3-VL-8B-Instruct-Q4_K_M.gguf \
+  --mmproj ${MODELS_DIR}/mmproj-qwen2-vl-7b-instruct-f16.gguf \
   --host 0.0.0.0 \
   --port 8083 \
   -ngl 20 \
   -c 2048 \
   -b 128 \
   -ub 128 \
-  -t 8
+  -t 8 \
+  --timeout 300
