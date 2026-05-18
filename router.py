@@ -6,6 +6,7 @@ import subprocess
 import time
 import whisper
 import pyttsx3
+from gtts import gTTS
 import os
 import tempfile
 from pathlib import Path
@@ -15,6 +16,7 @@ app = FastAPI()
 # Initialize Whisper model (small by default, can use 'base', 'medium', 'large')
 whisper_model = None
 
+
 def get_whisper_model():
     global whisper_model
     if whisper_model is None:
@@ -22,10 +24,15 @@ def get_whisper_model():
         whisper_model = whisper.load_model("base")
     return whisper_model
 
-# Initialize TTS engine
+
+# Initialize TTS engines
 tts_engine = pyttsx3.init()
 tts_engine.setProperty('rate', 150)  # Velocidad del habla
 tts_engine.setProperty('volume', 1.0)  # Volumen máximo
+
+# TTS settings
+USE_GTTS = True  # Set to False to use pyttsx3 fallback
+TTS_LANGUAGE = 'es'  # Language for gTTS (es=Spanish, en=English)
 
 FAST = "http://127.0.0.1:8081"
 SMART = "http://127.0.0.1:8082"
@@ -80,7 +87,8 @@ def ensure_server(url, script):
 
     for i in range(120):
         if proc.poll() is not None:
-            raise RuntimeError(f"Server process exited early with code {proc.poll()}")
+            raise RuntimeError(
+                f"Server process exited early with code {proc.poll()}")
 
         if server_alive(url):
             print("Server ready")
@@ -91,9 +99,9 @@ def ensure_server(url, script):
     raise RuntimeError("Server failed to start within 120 seconds")
 
 
-@app.on_event("startup")
-async def startup_event():
-    ensure_server(FAST, "./run-fast.sh")
+# @app.on_event("startup")
+# async def startup_event():
+    # ensure_server(FAST, "./run-smart.sh")
 
 
 @app.on_event("shutdown")
@@ -129,51 +137,53 @@ def is_complex(prompt):
 
     return False
 
+
 @app.get("/v1/models")
 async def models():
 
-  return {
-    "object": "list",
-    "data": [
-      {
-        "id": "gemma2-fast",
-        "object": "model",
-        "owned_by": "local"
-      },
-      {
-        "id": "gemma4-smart",
-        "object": "model",
-        "owned_by": "local"
-      },
-      {
-        "id": "qwen2vl-vision",
-        "object": "model",
-        "owned_by": "local"
-      }
-    ]
-  }
+    return {
+        "object": "list",
+        "data": [
+            {
+                "id": "gemma2-fast",
+                "object": "model",
+                "owned_by": "local"
+            },
+            {
+                "id": "gemma4-smart",
+                "object": "model",
+                "owned_by": "local"
+            },
+            {
+                "id": "qwen2vl-vision",
+                "object": "model",
+                "owned_by": "local"
+            }
+        ]
+    }
 
 
 @app.get("/v1/models/api/tags")
 async def tags():
 
-  return {
-    "object": "list",
-    "data": [
-      {
-        "id": "fast",
-        "object": "model_tag"
-      },
-      {
-        "id": "smart",
-        "object": "model_tag"
-      },
-      {
-        "id": "vision",
-        "object": "model_tag"
-      }
-    ]
-  }
+    return {
+        "object": "list",
+        "data": [
+            {
+                "id": "fast",
+                "object": "model_tag"
+            },
+            {
+                "id": "smart",
+                "object": "model_tag"
+            },
+            {
+                "id": "vision",
+                "object": "model_tag"
+            }
+        ]
+    }
+
 
 @app.post("/v1/chat/completions")
 async def route(req: dict):
@@ -185,13 +195,14 @@ async def route(req: dict):
     has_image = "image_url" in last
     model = req.get("model", "")
 
-    print(f"Routing request: model={model}, has_image={has_image}, is_complex={is_complex(last)}")
+    print(
+        f"Routing request: model={model}, has_image={has_image}, is_complex={is_complex(last)}")
 
     if model == "qwen2vl-vision":
         ensure_server(VISION, "./run-vision.sh")
         target = f"{VISION}/v1/chat/completions"
 
-    elif is_complex(last):
+    elif model == "gemma4-smart":
         try:
             ensure_server(SMART, "./run-smart.sh")
         except RuntimeError as exc:
@@ -205,7 +216,8 @@ async def route(req: dict):
     try:
         r = requests.post(target, json=req, timeout=30)
     except requests.RequestException as exc:
-        raise HTTPException(status_code=502, detail=f"Upstream request failed: {exc}")
+        raise HTTPException(
+            status_code=502, detail=f"Upstream request failed: {exc}")
 
     content_type = r.headers.get("content-type", "")
 
@@ -231,12 +243,13 @@ async def transcribe_audio(file: UploadFile = File(...)):
             content = await file.read()
             tmp_file.write(content)
             tmp_path = tmp_file.name
-        
+
         try:
             # Transcribir con Whisper
             model = get_whisper_model()
-            result = model.transcribe(tmp_path, language="es")  # Español por defecto
-            
+            result = model.transcribe(
+                tmp_path, language="es")  # Español por defecto
+
             return {
                 "text": result["text"],
                 "language": result.get("language", "es")
@@ -244,9 +257,10 @@ async def transcribe_audio(file: UploadFile = File(...)):
         finally:
             # Limpiar archivo temporal
             os.unlink(tmp_path)
-    
+
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error transcribing audio: {str(e)}")
+        raise HTTPException(
+            status_code=400, detail=f"Error transcribing audio: {str(e)}")
 
 
 @app.post("/v1/audio/speak")
@@ -256,16 +270,22 @@ async def text_to_speech(req: dict):
         text = req.get("text", "")
         if not text:
             raise HTTPException(status_code=400, detail="Text is required")
-        
+
         # Generar archivo de audio temporal
         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
             tmp_path = tmp_file.name
-        
+
         try:
-            # Convertir texto a voz
-            tts_engine.save_to_file(text, tmp_path)
-            tts_engine.runAndWait()
-            
+            if USE_GTTS:
+                # Use Google Text-to-Speech for more natural voice
+                tts = gTTS(text=text, lang=TTS_LANGUAGE,
+                           slow=False, tld='es.ar')
+                tts.save(tmp_path)
+            else:
+                # Fallback to pyttsx3
+                tts_engine.save_to_file(text, tmp_path)
+                tts_engine.runAndWait()
+
             # Retornar archivo de audio
             return FileResponse(
                 tmp_path,
@@ -276,9 +296,10 @@ async def text_to_speech(req: dict):
             if os.path.exists(tmp_path):
                 os.unlink(tmp_path)
             raise e
-    
+
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error generating speech: {str(e)}")
+        raise HTTPException(
+            status_code=400, detail=f"Error generating speech: {str(e)}")
 
 
 @app.post("/v1/chat/audio")
@@ -294,7 +315,7 @@ async def chat_with_voice(
             content = await audio_file.read()
             tmp_file.write(content)
             tmp_path = tmp_file.name
-        
+
         try:
             whisper_model = get_whisper_model()
             transcript = whisper_model.transcribe(tmp_path, language="es")
@@ -302,38 +323,45 @@ async def chat_with_voice(
             print(f"Transcribed: {user_text}")
         finally:
             os.unlink(tmp_path)
-        
+
         # Step 2: Enviar al LLM
         print(f"Routing to LLM with model: {model}")
         llm_request = {
             "messages": [{"role": "user", "content": user_text}],
             "model": model or "gemma2-fast"
         }
-        
+
         llm_response = await route(llm_request)
-        
+
         # Extraer el texto de la respuesta
         if hasattr(llm_response, "body"):
             import json
             response_json = json.loads(llm_response.body)
         else:
             response_json = llm_response
-        
-        assistant_text = response_json.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+        assistant_text = response_json.get("choices", [{}])[0].get(
+            "message", {}).get("content", "")
         print(f"LLM response: {assistant_text}")
-        
+
         # Step 3: Convertir respuesta a audio
         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
             tmp_audio_path = tmp_file.name
-        
+
         try:
-            tts_engine.save_to_file(assistant_text, tmp_audio_path)
-            tts_engine.runAndWait()
-            
+            if USE_GTTS:
+                # Use Google Text-to-Speech for more natural voice
+                tts = gTTS(text=assistant_text, lang=TTS_LANGUAGE, slow=False)
+                tts.save(tmp_audio_path)
+            else:
+                # Fallback to pyttsx3
+                tts_engine.save_to_file(assistant_text, tmp_audio_path)
+                tts_engine.runAndWait()
+
             # Retornar JSON con texto y URL/contenido de audio
             with open(tmp_audio_path, "rb") as f:
                 audio_bytes = f.read()
-            
+
             return {
                 "user_input": user_text,
                 "assistant_response": assistant_text,
@@ -343,6 +371,7 @@ async def chat_with_voice(
         finally:
             if os.path.exists(tmp_audio_path):
                 os.unlink(tmp_audio_path)
-    
+
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error in voice chat: {str(e)}")
+        raise HTTPException(
+            status_code=400, detail=f"Error in voice chat: {str(e)}")

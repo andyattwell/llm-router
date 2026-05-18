@@ -14,5 +14,5 @@ cd "$LLAMA" && exec llama-server \
   -c 4096 \
   -b 512 \
   -ub 512 \
-  -t 8 \
-  --timeout 600
+  -t 8 
+  # --timeout 600

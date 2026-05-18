@@ -1,0 +1,16 @@
+[project]
+name = "routing-llm"
+version = "0.1.0"
+description = "An llm router and voice stuff too"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.100.0",
+  "uvicorn>=0.20.0",
+  "requests>=2.25.0",
+  "python-multipart>=0.0.5",
+  "openai-whisper>=20230314",
+  "gtts>=2.2.0",
+  "pyttsx3>=2.90",
+  "tts>=0.22.0",
+]
